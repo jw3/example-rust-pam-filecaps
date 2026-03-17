@@ -6,7 +6,7 @@ if [[ -z "$1" ]]; then
 fi
 
 # install pam service config
-sudo cp conf/example-rust-pam /etc/pam.d
+sudo cp conf/example-rust-pam-service /etc/pam.d
 
 # build
 cargo build --release
@@ -20,8 +20,8 @@ sudo setcap 'cap_setuid,cap_setgid=ep' example-rust-pam
 id; getcap example-rust-pam
 
 # run the test
-./example-rust-pam -s example-rust-pam "$1"
+./example-rust-pam -s example-rust-pam-service "$1"
 
 # cleanup
 sudo rm ./example-rust-pam
-sudo rm /etc/pam.d/example-rust-pam
+sudo rm /etc/pam.d/example-rust-pam-service

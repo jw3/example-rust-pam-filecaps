@@ -13,7 +13,7 @@ cargo build --release
 
 # prep the executable
 sudo mv target/release/example-rust-pam .
-sudo chown root:root example-rust-pa
+sudo chown root:root example-rust-pam
 sudo setcap 'cap_setuid,cap_setgid=ep' example-rust-pam
 
 # debug for sanity check

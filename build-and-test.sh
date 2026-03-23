@@ -10,6 +10,7 @@ sudo cp conf/example-rust-pam-service /etc/pam.d
 
 # build
 cargo build --release
+if [ $? -ne 0 ]; then echo "cargo build failed"; exit 1; fi
 
 # prep the executable
 sudo mv target/release/example-rust-pam .

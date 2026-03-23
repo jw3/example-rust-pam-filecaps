@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 pam = { version = "0.8.0", features = ["client"] }
+caps = "0.5.6"
+nix = { version = "0.31.2", features = ["user"] }
 rpassword = "7"
 anyhow = "1"
-capng = { version = "0.2" }
-libc = "0.2"
 clap = { version = "4", features = ["derive"] }
 zeroize   = "1"

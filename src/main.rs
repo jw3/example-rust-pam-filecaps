@@ -1,5 +1,7 @@
 use anyhow::{bail, Context, Result};
+use caps::{CapSet, Capability};
 use clap::Parser;
+use nix::unistd::{Gid, Uid};
 use pam::Client;
 use zeroize::Zeroizing;
 
@@ -16,8 +18,8 @@ fn main() -> Result<()> {
     println!("using pam service: {}", opts.service);
 
     // stash original uid/gid - note;; not restoring suppl groups in this example
-    let orig_uid = unsafe { libc::getuid() as i32 };
-    let orig_gid = unsafe { libc::getgid() as i32 };
+    let uid = Uid::effective();
+    let gid = Gid::effective();
 
     // read password before elevating
     let password: Zeroizing<String> = Zeroizing::new(
@@ -31,12 +33,16 @@ fn main() -> Result<()> {
     auth.conversation_mut()
         .set_credentials(&opts.username, password.as_str());
 
+    // ensure file caps are present
+    caps::has_cap(None, CapSet::Effective, Capability::CAP_SETUID)?;
+    caps::has_cap(None, CapSet::Effective, Capability::CAP_SETGID)?;
+
     //
     // elevate
     //
-    capng::get_caps_process()?;
-    capng::change_id(0, 0, capng::Flags::DROP_SUPP_GRP)
-        .context("capng::change_id(0,0) failed -- is cap_setuid,cap_setgid=ep set on binary?")?;
+    nix::unistd::seteuid(Uid::from_raw(0)).context("seteuid 0 failed -- is cap_setuid=ep set on binary?")?;
+    nix::unistd::setegid(Gid::from_raw(0)).context("setegid 0 failed -- is cap_setgid=ep set on binary?")?;
+    nix::unistd::setgroups(&[]).context("clear suppl groups failed")?;
 
     // pam_authenticate() is the only call that actually needs root
     // it opens /etc/shadow (via pam_unix.so) to verify the password hash
@@ -46,15 +52,13 @@ fn main() -> Result<()> {
     drop(auth);
 
     //
-    // drop privileges and switch back to original user
+    // switch back to original user and drop caps
     //
-    capng::get_caps_process()?;
-    capng::change_id(orig_uid, orig_gid, capng::Flags::DROP_SUPP_GRP)
-        .context("capng::change_id(orig) failed while dropping privileges")?;
-    capng::clear(capng::Set::all());
-    capng::apply(capng::Set::all()).context("failed to apply cleared capability sets")?;
+    nix::unistd::seteuid(uid).context("setuid 0 failed -- is cap_setuid=ep set on binary?")?;
+    nix::unistd::setegid(gid).context("setgid 0 failed -- is cap_setgid=ep set on binary?")?;
+    caps::clear(None, CapSet::Effective)?;
 
-    // zero the password now that PAM is done with it.
+    // zero the password now that auth is complete
     drop(password);
 
     match auth_result {

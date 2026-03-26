@@ -33,15 +33,19 @@ fn main() -> Result<()> {
     auth.conversation_mut()
         .set_credentials(&opts.username, password.as_str());
 
-    // ensure file caps are present
-    caps::has_cap(None, CapSet::Effective, Capability::CAP_SETUID)?;
-    caps::has_cap(None, CapSet::Effective, Capability::CAP_SETGID)?;
+    // ensure setuid / gid caps are permitted
+    caps::has_cap(None, CapSet::Permitted, Capability::CAP_SETUID)?;
+    caps::has_cap(None, CapSet::Permitted, Capability::CAP_SETGID)?;
+
+    // activate caps
+    caps::raise(None, CapSet::Effective, Capability::CAP_SETUID)?;
+    caps::raise(None, CapSet::Effective, Capability::CAP_SETGID)?;
 
     //
     // elevate
     //
-    nix::unistd::seteuid(Uid::from_raw(0)).context("seteuid 0 failed -- is cap_setuid=ep set on binary?")?;
-    nix::unistd::setegid(Gid::from_raw(0)).context("setegid 0 failed -- is cap_setgid=ep set on binary?")?;
+    nix::unistd::seteuid(Uid::from_raw(0)).context("seteuid 0 failed")?;
+    nix::unistd::setegid(Gid::from_raw(0)).context("setegid 0 failed")?;
     nix::unistd::setgroups(&[]).context("clear suppl groups failed")?;
 
     // pam_authenticate() is the only call that actually needs root
@@ -54,8 +58,8 @@ fn main() -> Result<()> {
     //
     // switch back to original user and drop caps
     //
-    nix::unistd::seteuid(uid).context("setuid 0 failed -- is cap_setuid=ep set on binary?")?;
-    nix::unistd::setegid(gid).context("setgid 0 failed -- is cap_setgid=ep set on binary?")?;
+    nix::unistd::seteuid(uid).context("restore setuid failed")?;
+    nix::unistd::setegid(gid).context("restore setgid failed")?;
     caps::clear(None, CapSet::Effective)?;
 
     // zero the password now that auth is complete
